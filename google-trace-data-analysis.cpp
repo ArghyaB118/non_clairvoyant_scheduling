@@ -111,6 +111,61 @@ unsigned long long non_interruptive_opt () {
 	return total_completion_time;
 }
 
+/*
+|---|-------|-----------|	=> job x released at 0, job y released at \delta
+0	\delta	y 			x  	=> job x is interrupted, job y done, then x done
+
+|---|-------|-----------|	
+0	\delta	x 	x-\delta+y 	=> job x is not interrupted, then job y done
+
+Given, y < x. in fact, y < x-\delta. If SRPT is followed, x should be interrupted
+However, preemption causes to lose the entire progress on the job.
+Hence, SRPT is not optimal offline.
+with interruption, total completion time, C = y+(x+y+\delta) = x+2y+\delta
+without interruption, C = x+(x-\delta+y) = 2x+y-\delta
+Condition when x should not be interrupted:
+2x+y-\delta < x+2y+\delta => x < y+2\delta
+Hence, y+\delta < x < y+2\delta, x should not be interrupted.
+Otherwise, x should be interrupted.
+*/
+
+unsigned long long interruptive_opt () {
+	int i = 0;
+	unsigned long long horizon = stoi(arrival_times[i].first);
+	unsigned long long total_completion_time = 0;
+	priority_queue<pairULL, vector<pairULL>, Compare> pq;
+	while (i < arrival_times.size()) {
+		unsigned long long arrival_time = stoi(arrival_times[i].first);
+		if (horizon >= arrival_time) {
+			pairULL tmp;
+			tmp.first = arrival_time;
+			tmp.second = arrival_times[i].second;
+			pq.push(tmp);
+			i++;
+		}
+		// x = task_ids[pq.top().second]
+		// \delta = stoi(arrival_times[i].first) - horizon
+		// y = task_ids[arrival_times[i].second]
+		else if ((horizon < arrival_time) && (task_ids[pq.top().second] >= (task_ids[arrival_times[i].second] + 2 * stoi(arrival_times[i].first) - horizon))) {
+			pairULL tmp;
+			tmp.first = arrival_time;
+			tmp.second = arrival_times[i].second;
+			pq.push(tmp);
+			i++;
+		}
+		else {
+			horizon += task_ids[pq.top().second];
+			total_completion_time += (horizon - pq.top().first);
+			pq.pop();
+		}
+	}
+	while (!pq.empty()) {
+		horizon += task_ids[pq.top().second];
+		total_completion_time += (horizon - pq.top().first);
+		pq.pop();
+	}
+	return total_completion_time;
+}
 
 int main () {
 	read_csv ("./google-trace/google-cluster-data-1.csv");
@@ -118,6 +173,8 @@ int main () {
 	C = follow_arrival_order();
 	cout << "Follow Arrival Order: " << C << endl;
 	C = non_interruptive_opt();
-	cout << "Non Interruptive OPT: " << C << endl;
+	cout << "Non-interruptive OPT: " << C << endl;
+	C = interruptive_opt();
+	cout << "Interruptive OPT: " << C << endl;
 	return 0;
 }
