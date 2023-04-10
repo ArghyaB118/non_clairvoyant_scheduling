@@ -167,14 +167,74 @@ unsigned long long interruptive_opt () {
 	return total_completion_time;
 }
 
+class custom_queue {
+private:
+	vector<pairULL> jobs;
+	int executed;
+public:
+	custom_queue() {
+		this->jobs = {};
+		this->executed = 0;
+	}
+	void enqueue (pairULL p) {
+		int n = rand() % (this->jobs.size() - this->executed + 1);
+		this->jobs.insert(this->jobs.begin() + this->executed + n, p);
+	}
+	void execute () {
+		this->executed++;
+		// this->jobs.erase(this->jobs.begin(), this->jobs.begin() + 1);
+	}
+	pairULL top () {
+		return this->jobs[this->executed];
+	}
+	bool empty() {
+		if (this->jobs.size() == this->executed)
+			return true;
+		return false;
+	}
+};
+
+unsigned long long non_interruptive_rjf () {
+	int i = 0;
+	unsigned long long horizon = stoi(arrival_times[i].first);
+	unsigned long long total_completion_time = 0;
+	custom_queue cq;
+	while (i < arrival_times.size()) {
+		// cout << i << endl;
+		unsigned long long arrival_time = stoi(arrival_times[i].first);
+		if (horizon >= arrival_time) {
+			pairULL tmp;
+			tmp.first = arrival_time;
+			tmp.second = arrival_times[i].second;
+			cq.enqueue(tmp);
+			i++;
+		}
+		else {
+			pairULL tmp = cq.top();
+			horizon += task_ids[tmp.second];
+			total_completion_time += (horizon - tmp.first);
+			cq.execute();
+		}
+	}
+	// cout << i << endl;
+	while (!cq.empty()) {
+		horizon += task_ids[cq.top().second];
+		total_completion_time += (horizon - cq.top().first);
+		cq.execute();
+	}
+	return total_completion_time;	
+}
+
 int main () {
 	read_csv ("./google-trace/google-cluster-data-1.csv");
 	unsigned long long C = 0;
-	C = follow_arrival_order();
+	C = follow_arrival_order(); // 2412441911330
 	cout << "Follow Arrival Order: " << C << endl;
-	C = non_interruptive_opt();
+	C = non_interruptive_opt(); // 702009347060
 	cout << "Non-interruptive OPT: " << C << endl;
-	C = interruptive_opt();
+	C = interruptive_opt(); // 702009347060
 	cout << "Interruptive OPT: " << C << endl;
+	C = non_interruptive_rjf(); // 1558362353940
+	cout << "Non-interruptive Random Job First: " << C << endl;
 	return 0;
 }
