@@ -5,6 +5,7 @@
 #include <fstream>
 #include <unordered_map>
 #include <queue>
+#include <unordered_set>
 using namespace std;
 typedef pair<string, string> pairS;
 // Global data containers
@@ -80,7 +81,6 @@ public:
         return p1.first < p2.first;
     }
 };
-
 
 unsigned long long non_interruptive_opt () {
 	int i = 0;
@@ -192,6 +192,12 @@ public:
 			return true;
 		return false;
 	}
+	int size() {
+		return this->jobs.size();
+	}
+	void dequeue (pairULL p) {
+		std::remove (this->jobs.begin(), this->jobs.end(), p);
+	}
 };
 
 unsigned long long non_interruptive_rjf () {
@@ -203,10 +209,11 @@ unsigned long long non_interruptive_rjf () {
 		// cout << i << endl;
 		unsigned long long arrival_time = stoi(arrival_times[i].first);
 		if (horizon >= arrival_time) {
-			pairULL tmp;
+			cq.enqueue({arrival_time, arrival_times[i].second});
+			/*pairULL tmp;
 			tmp.first = arrival_time;
 			tmp.second = arrival_times[i].second;
-			cq.enqueue(tmp);
+			cq.enqueue(tmp);*/
 			i++;
 		}
 		else {
@@ -225,6 +232,100 @@ unsigned long long non_interruptive_rjf () {
 	return total_completion_time;	
 }
 
+// error = 0 => consistent
+unsigned long long non_interruptive_mla_rjf (float error) {
+	double lambda = 0.5;
+	int i = 0;
+	unsigned long long horizonMLA = stoi(arrival_times[i].first);
+	unsigned long long horizonRJF = stoi(arrival_times[i].first);
+	unsigned long long total_completion_time = 0;
+	custom_queue cq;
+	priority_queue<pairULL, vector<pairULL>, Compare> pq;
+	unordered_set<string> executed_ids;
+	while (i < arrival_times.size()) {
+		unsigned long long arrival_time = stoi(arrival_times[i].first);
+		// cout << i << " " << arrival_time << " " << horizonMLA << " " << horizonRJF << endl;
+		if (min(horizonMLA, horizonRJF) >= arrival_time) {
+			cq.enqueue({arrival_time, arrival_times[i].second});
+			pq.push({arrival_time, arrival_times[i].second});
+			i++;
+		}
+		else if (horizonMLA <= horizonRJF) {
+			while (true) {
+				if (executed_ids.find(pq.top().second) != executed_ids.end())
+					pq.pop();
+				else
+					break;
+			}
+			horizonMLA += (task_ids[pq.top().second] / lambda);
+			total_completion_time += (horizonMLA - pq.top().first);
+			executed_ids.insert(pq.top().second);
+			pq.pop();	
+		}
+		else if (horizonRJF < horizonMLA) {
+			// cout << cq.top().first << " " << cq.top().second << endl;
+			while (true) {
+				if (executed_ids.find(cq.top().second) != executed_ids.end())
+					cq.execute();
+				else
+					break;
+			}
+			// cout << cq.top().first << cq.top().second << endl;
+			pairULL tmp = cq.top();
+			horizonRJF += (task_ids[tmp.second] / (1 - lambda));
+			total_completion_time += (horizonMLA - tmp.first);
+			executed_ids.insert(tmp.second);
+			cq.execute();
+		}
+	}
+	while (!cq.empty() && !pq.empty()) {
+		if (horizonMLA <= horizonRJF && !pq.empty()) {
+			// cout << "here" << pq.top().first << pq.top().second << endl;
+			while (executed_ids.find(pq.top().second) != executed_ids.end())
+				pq.pop();
+			if (!pq.empty()) {
+				horizonMLA += (task_ids[pq.top().second] / lambda);
+				total_completion_time += (horizonMLA - pq.top().first);
+				executed_ids.insert(pq.top().second);
+				pq.pop();
+			}
+		}
+		else if (horizonMLA > horizonRJF && !cq.empty()) {
+			// cout << "heres" << cq.top().first << cq.top().second << endl;
+			while (executed_ids.find(cq.top().second) != executed_ids.end())
+				cq.execute();
+			if (!cq.empty()) {
+				horizonRJF += (task_ids[cq.top().second] / (1 - lambda));
+				total_completion_time += (horizonRJF - cq.top().first);
+				executed_ids.insert(cq.top().second);
+				cq.execute();
+			}
+		}
+	}
+	// cout << pq.size() << " " << cq.size() << endl;
+	if (!pq.empty()) {
+		while (!pq.empty()) {
+			if (executed_ids.find(pq.top().second) == executed_ids.end()) {
+				horizonMLA += (task_ids[pq.top().second] / lambda);
+				total_completion_time += (horizonMLA - pq.top().first);
+				executed_ids.insert(pq.top().second);
+			}
+			pq.pop();
+		}
+	}
+	if (!cq.empty()) {
+		while (!cq.empty()) {
+			if (executed_ids.find(cq.top().second) == executed_ids.end()) {
+				horizonRJF += (task_ids[cq.top().second] / (1 - lambda));
+				total_completion_time += (horizonRJF - cq.top().first);
+				executed_ids.insert(cq.top().second);
+			}
+			cq.execute();
+		}
+	}
+	return total_completion_time;
+}
+
 int main () {
 	read_csv ("./google-trace/google-cluster-data-1.csv");
 	unsigned long long C = 0;
@@ -236,5 +337,7 @@ int main () {
 	cout << "Interruptive OPT: " << C << endl;
 	C = non_interruptive_rjf(); // 1558362353940
 	cout << "Non-interruptive Random Job First: " << C << endl;
+	C = non_interruptive_mla_rjf(0.5); // 829919915530
+	cout << "Non-interruptive Consistent MLA-RJF: " << C << endl;
 	return 0;
 }
