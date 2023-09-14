@@ -47,15 +47,24 @@ void read_csv (string f) {
 	cout << "Number of unsorted jobs: " << unsorted << endl;
 	cout << "Number of unique IDs: " << arrival_times.size() << endl;
 	int min_length = task_ids[arrival_times[0].second], max_length = task_ids[arrival_times[0].second];
+	unsigned long long average = 0;
+	count = 0;
 	for (auto & i : task_ids) {
 		if (i.second < min_length)
 			min_length = i.second;
 		if (i.second > max_length)
 			max_length = i.second;
+		count++; average += i.second;
 	}
+	average /= count;
+	unsigned long long variance = 0;
+	for (auto & i : task_ids)
+		variance += (i.second - average) * (i.second - average);
+	variance /= count;
 	cout << "Shortest job length: " << min_length << endl;
 	cout << "Largest job length: " << max_length << endl;
 	cout << "Ratio of largest to smallest job length: " << (float)max_length / min_length << endl;
+	cout << "Variance: " << variance << endl;
 }
 
 unsigned long long follow_arrival_order () {
@@ -82,11 +91,18 @@ public:
     }
 };
 
+class CustomCompare {
+public:
+    bool operator() (pairULL p1, pairULL p2) {
+        return task_ids[p1.second] > task_ids[p2.second];
+    }
+};
+
 unsigned long long non_interruptive_opt () {
 	int i = 0;
 	unsigned long long horizon = stoi(arrival_times[i].first);
 	unsigned long long total_completion_time = 0;
-	priority_queue<pairULL, vector<pairULL>, Compare> pq;
+	priority_queue<pairULL, vector<pairULL>, CustomCompare> pq;
 	while (i < arrival_times.size()) {
 		// cout << arrival_times[i].first << endl;
 		unsigned long long arrival_time = stoi(arrival_times[i].first);
@@ -133,7 +149,7 @@ unsigned long long interruptive_opt () {
 	int i = 0;
 	unsigned long long horizon = stoi(arrival_times[i].first);
 	unsigned long long total_completion_time = 0;
-	priority_queue<pairULL, vector<pairULL>, Compare> pq;
+	priority_queue<pairULL, vector<pairULL>, CustomCompare> pq;
 	while (i < arrival_times.size()) {
 		unsigned long long arrival_time = stoi(arrival_times[i].first);
 		if (horizon >= arrival_time) {
@@ -331,13 +347,13 @@ int main () {
 	unsigned long long C = 0;
 	C = follow_arrival_order(); // 2412441911330
 	cout << "Follow Arrival Order: " << C << endl;
-	C = non_interruptive_opt(); // 702009347060
+	C = non_interruptive_opt(); // 514453773515 // 702009347060
 	cout << "Non-interruptive OPT: " << C << endl;
-	C = interruptive_opt(); // 702009347060
+	C = interruptive_opt(); // 514453773515 (CustomCompare) // 702009347060
 	cout << "Interruptive OPT: " << C << endl;
 	C = non_interruptive_rjf(); // 1558362353940
 	cout << "Non-interruptive Random Job First: " << C << endl;
-	C = non_interruptive_mla_rjf(0.5); // 829919915530
+	//C = non_interruptive_mla_rjf(0.5); // 593102196350 // 829919915530
 	cout << "Non-interruptive Consistent MLA-RJF: " << C << endl;
 	return 0;
 }
